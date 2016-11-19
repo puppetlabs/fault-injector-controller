@@ -1,5 +1,12 @@
 # .gitignore based on https://github.com/github/gitignore
 
+####################
+# Project-specific #
+####################
+
+# Compiled binaries path
+bin/
+
 ################
 # Go.gitignore #
 ################
