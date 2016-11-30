@@ -4,8 +4,8 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"time"
 
+	"github.com/puppetlabs/fault-injector-controller/pkg/controller"
 	"github.com/puppetlabs/fault-injector-controller/version"
 )
 
@@ -23,8 +23,13 @@ func main() {
 		fmt.Println("fault-injector-controller", version.Version)
 		os.Exit(0)
 	}
-	for i := 0; i < 100; i++ {
-		fmt.Println(i)
-		time.Sleep(time.Second)
+	c, err := controller.New()
+	if err != nil {
+		fmt.Fprint(os.Stderr, err)
+		os.Exit(1)
+	}
+	if err := c.Run(); err != nil {
+		fmt.Fprint(os.Stderr, err)
+		os.Exit(1)
 	}
 }

@@ -1,0 +1,6 @@
+package: github.com/puppetlabs/fault-injector-controller
+import:
+- package: k8s.io/client-go
+  version: ~1.5.0
+  subpackages:
+  - 1.5/kubernetes
