@@ -34,7 +34,7 @@ func New() (*PodKiller, error) {
 
 // Run starts the PodKiller service.
 func (p *PodKiller) Run(interval time.Duration, stopChan <-chan struct{}) error {
-	go wait.Until(p.killPods, interval, stopChan)
+	wait.Until(p.killPods, interval, stopChan)
 	return nil
 }
 
