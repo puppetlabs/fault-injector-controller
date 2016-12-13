@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"math/rand"
 	"os"
 	"time"
 
@@ -17,6 +18,8 @@ var (
 func init() {
 	flag.BoolVar(&printVersion, "version", false, "Show version and quit")
 	flag.Parse()
+
+	rand.Seed(time.Now().UnixNano())
 }
 
 func main() {

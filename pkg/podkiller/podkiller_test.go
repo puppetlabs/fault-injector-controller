@@ -12,8 +12,9 @@ import (
 	"k8s.io/client-go/1.5/pkg/runtime"
 )
 
+// TestRun tests the PodKiller.Run() method to validate that it kills pods periodically as expected.
 func TestRun(t *testing.T) {
-	objects, err := generatePodList(5)
+	objects, err := generatePodList(10)
 	if err != nil {
 		t.Fatal("Error when generating pods for test:", err)
 	}
@@ -25,8 +26,10 @@ func TestRun(t *testing.T) {
 	}
 
 	t.Run("testRunFourSecondInterval", p.testRunGenerator(time.Second*4, 4))
+	t.Run("testRunSixSecondInterval", p.testRunGenerator(time.Second*6, 2))
 }
 
+// TestKillPods tests the PodKiller.killPods() method to validate that it kills exactly one pod each time it is called.
 func TestKillPods(t *testing.T) {
 	objects, err := generatePodList(3)
 	if err != nil {
@@ -68,6 +71,7 @@ func TestKillPods(t *testing.T) {
 	}
 }
 
+// generatePodList generates an array of v1.Pod objects which can be used to instantiate a SimpleClientSet for testing.
 func generatePodList(count int) ([]runtime.Object, error) {
 	names := []string{
 		"lanthanum", "cerium", "praseodymium", "neodymium", "promethium",
@@ -84,6 +88,7 @@ func generatePodList(count int) ([]runtime.Object, error) {
 	return podList, nil
 }
 
+// testRunGenerator returns a function that will call p.Run() and then check that the expected number of pods were killed.
 func (p *PodKiller) testRunGenerator(interval time.Duration, iterations int) func(*testing.T) {
 	return func(t *testing.T) {
 		initialPods, err := p.kclient.Core().Pods(api.NamespaceDefault).List(api.ListOptions{})
@@ -95,17 +100,14 @@ func (p *PodKiller) testRunGenerator(interval time.Duration, iterations int) fun
 			t.Fatal("Cannot test", iterations, "iterations with only", initialPodCount, "pods.")
 		}
 		stopChan := make(chan struct{})
-		defer close(stopChan)
 
 		go p.Run(interval, stopChan)
-		for i := 0; i < iterations; i++ {
-			if pods, err := p.kclient.Core().Pods(api.NamespaceDefault).List(api.ListOptions{}); err != nil {
-				t.Error("Unexpected error when trying to list pods:", err)
-			} else if len(pods.Items) != initialPodCount-i {
-				t.Error("Expected there to be", initialPodCount-i, "pods after", i+1, "iterations, but found", len(pods.Items))
-			}
-			// TODO: this fails sometimes when the timing doesn't line up right.
-			time.Sleep(interval)
+		time.Sleep(interval * time.Duration(iterations))
+		close(stopChan)
+		if pods, err := p.kclient.Core().Pods(api.NamespaceDefault).List(api.ListOptions{}); err != nil {
+			t.Error("Unexpected error when trying to list pods:", err)
+		} else if len(pods.Items) != initialPodCount-iterations {
+			t.Error("Expected there to be", initialPodCount-iterations, "pods after", iterations, "iterations, but found", len(pods.Items))
 		}
 	}
 }
