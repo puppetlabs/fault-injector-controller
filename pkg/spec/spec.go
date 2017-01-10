@@ -21,4 +21,8 @@ type FaultInjectorList struct {
 
 // FaultInjectorSpec holds specification parameters for a FaultInjector deployment.
 type FaultInjectorSpec struct {
+	Type FaultInjectorType `json:"type,omitempty"`
 }
+
+// FaultInjectorType represents an implemented manner of fault injection.
+type FaultInjectorType string
