@@ -3,6 +3,7 @@ package controller
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/puppetlabs/fault-injector-controller/pkg/spec"
@@ -55,6 +56,20 @@ func TestGenerateDownstreamContainers(t *testing.T) {
 					t.Errorf("Found no error when generating container list but expected to find: %v", test.ErrorValue)
 				} else if err.Error() != test.ErrorValue.Error() {
 					t.Errorf("When generating container list, expected to find error:\n%v\nbut instead found:\n%v", test.ErrorValue, err)
+				}
+			}
+
+			for _, container := range containers {
+				splits := strings.SplitN(container.Image, ":", 2)
+				if splits[1] == "" {
+					t.Errorf("Container %v has an unexpectedly empty tag", container.Name)
+				}
+				imageNames := strings.Split(splits[0], "/")
+				for _, imageName := range imageNames {
+					if imageName == "" {
+						t.Errorf("Container %v has an invalid image name: %v", container.Name, splits[0])
+						break
+					}
 				}
 			}
 		})

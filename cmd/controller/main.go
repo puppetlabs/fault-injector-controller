@@ -35,7 +35,9 @@ func main() {
 	}
 	if printImage {
 		fmt.Printf("%v/fault-injector-controller:%v\n", version.ImageRepo, version.Version)
+		os.Exit(0)
 	}
+	fmt.Printf("FaultInjector controller, version %v\n", version.Version)
 	c, err := controller.New(cfg)
 	if err != nil {
 		fmt.Fprint(os.Stderr, err)

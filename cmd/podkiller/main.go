@@ -32,7 +32,9 @@ func main() {
 	}
 	if printImage {
 		fmt.Printf("%v/fault-injector-podkiller:%v\n", version.ImageRepo, version.Version)
+		os.Exit(0)
 	}
+	fmt.Printf("FaultInjector PodKiller, version %v\n", version.Version)
 	p, err := podkiller.New()
 	if err != nil {
 		fmt.Fprint(os.Stderr, err)

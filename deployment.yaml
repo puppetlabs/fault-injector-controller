@@ -1,0 +1,15 @@
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: fault-injector-controller
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: fault-injector-controller
+    spec:
+      containers:
+       - name: fault-injector-controller
+         image: gcr.io/puppet-panda-dev/fault-injector-controller:0.1.0-git2
