@@ -20,7 +20,7 @@ func generateDownstreamObject(obj *spec.FaultInjector) (*extensionsobj.Deploymen
 	deploymentObj := &extensionsobj.Deployment{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      formatDownstreamName(obj),
-			Namespace: v1.NamespaceDefault,
+			Namespace: obj.ObjectMeta.Namespace,
 			Labels:    map[string]string{"generatedBy": "FaultInjector"},
 		},
 		Spec: extensionsobj.DeploymentSpec{

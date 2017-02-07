@@ -91,12 +91,9 @@ func TestPrepareInitialStore(t *testing.T) {
 }
 
 func TestGetDownstreamState(t *testing.T) {
-	var clientset *fkubernetes.Clientset
-	clientset = fkubernetes.NewSimpleClientset()
-	c := &FaultInjectorController{
-		kclient: clientset,
-	}
-	source := &spec.FaultInjector{
+	c, _ := prepareResourceHandlerTest()
+	clientset := c.kclient.(*fkubernetes.Clientset)
+	defaultSource := &spec.FaultInjector{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      "hydrogen",
 			Namespace: v1.NamespaceDefault,
@@ -105,37 +102,45 @@ func TestGetDownstreamState(t *testing.T) {
 			Type: "PodKiller",
 		},
 	}
-	deployment, err := generateDownstreamObject(source)
+	defaultDeployment, err := generateDownstreamObject(defaultSource)
+	if err != nil {
+		t.Fatalf("Found unexpected exception when generating initial downstream object: %v", err)
+	}
+	namespaceSourceList, err := generateTestFaultInjectors(1)
+	namespaceSource := namespaceSourceList[0]
+	namespaceDeployment, err := generateDownstreamObject(namespaceSource)
 	if err != nil {
 		t.Fatalf("Found unexpected exception when generating initial downstream object: %v", err)
 	}
 
-	testResponse := func(t *testing.T) {
-		expected, err := clientset.Extensions().Deployments(v1.NamespaceDefault).Get(formatDownstreamName(source))
-		actual := c.getDownstreamState(source)
-		if err == nil {
-			if !reflect.DeepEqual(expected, actual) {
-				t.Errorf("Expected to find:\n%v\nbut instead found:\n%v", expected, actual)
-			}
-		} else {
-			if actual != nil {
-				t.Errorf("Found unexpected object when expected nil:\n%v", actual)
+	testResponse := func(source *spec.FaultInjector) func(t *testing.T) {
+		return func(t *testing.T) {
+			expected, err := clientset.Extensions().Deployments(source.ObjectMeta.Namespace).Get(formatDownstreamName(source))
+			actual := c.getDownstreamState(source)
+			if err == nil {
+				if !reflect.DeepEqual(expected, actual) {
+					t.Errorf("Expected to find:\n%v\nbut instead found:\n%v", expected, actual)
+				}
+			} else {
+				if actual != nil {
+					t.Errorf("Found unexpected object when expected nil:\n%v", actual)
+				}
 			}
 		}
 	}
 
-	t.Run("MissingObject", testResponse)
+	t.Run("MissingObject", testResponse(defaultSource))
 
-	clientset.Extensions().Deployments(v1.NamespaceAll).Create(deployment)
-	t.Run("ObjectExists", testResponse)
+	clientset.Extensions().Deployments(v1.NamespaceDefault).Create(defaultDeployment)
+	t.Run("ObjectExistsDefaultNamespace", testResponse(defaultSource))
+
+	clientset.Extensions().Deployments(namespaceDeployment.ObjectMeta.Namespace).Create(namespaceDeployment)
+	t.Run("ObjectExistsDifferentNamespace", testResponse(namespaceSource))
 }
 
 func TestAddFaultInjector(t *testing.T) {
-	var clientset *fkubernetes.Clientset
-	clientset = fkubernetes.NewSimpleClientset()
-	c := &FaultInjectorController{
-		kclient: clientset,
-	}
+	c, _ := prepareResourceHandlerTest()
+	clientset := c.kclient.(*fkubernetes.Clientset)
 
 	sources, err := generateTestFaultInjectors(3)
 	if err != nil {
@@ -183,16 +188,26 @@ func TestAddFaultInjector(t *testing.T) {
 		deployments = getDeploymentList(clientset, t)
 		validateResourceList(t, deployments, sources[1:])
 	})
+
+	t.Run("AddDifferentNamespace", func(t *testing.T) {
+		var newResource spec.FaultInjector
+		newResource = *sources[1]
+		newResource.ObjectMeta.Namespace = v1.NamespaceDefault
+		sources = append(sources, &newResource)
+		err = c.addFaultInjector(&newResource)
+		if err != nil {
+			t.Errorf("Found unexpected error when adding resource: %v", err)
+		}
+		deployments = getDeploymentList(clientset, t)
+		validateResourceList(t, deployments, sources[1:])
+	})
 }
 
 func TestDeleteFaultInjector(t *testing.T) {
 	count := 2
 
-	var clientset *fkubernetes.Clientset
-	clientset = fkubernetes.NewSimpleClientset()
-	c := &FaultInjectorController{
-		kclient: clientset,
-	}
+	c, _ := prepareResourceHandlerTest()
+	clientset := c.kclient.(*fkubernetes.Clientset)
 	sources, err := generateTestFaultInjectors(count)
 	if err != nil {
 		t.Fatalf("Error when generating resources for test: %v", err)
@@ -430,15 +445,13 @@ func TestCreateTPR(t *testing.T) {
 		Resource: "thirdpartyresources",
 	}
 
-	var clientset *fkubernetes.Clientset
-	clientset = fkubernetes.NewSimpleClientset()
-	c := &FaultInjectorController{
-		kclient: clientset,
-	}
+	c, _ := prepareResourceHandlerTest()
+	clientset := c.kclient.(*fkubernetes.Clientset)
 	c.createTPR()
 
 	actions := clientset.Fake.Actions()
-	firstAction, actions := actions[0], actions[1:]
+	// We create two namespaces in prepareResourceHandlerTest(): skip those.
+	firstAction, actions := actions[2], actions[3:]
 	if firstAction.GetVerb() != "create" {
 		t.Error("Expected to create the FaultInjector ThirdPartyResource first, but did not.")
 	} else if res := firstAction.GetResource(); res != expectedResource {
@@ -478,6 +491,7 @@ func generateTestFaultInjectors(count int) ([]*spec.FaultInjector, error) {
 	}
 	var tests []*spec.FaultInjector
 	for k := 0; k < count; k++ {
+		var namespace string
 		labels := make(map[string]string)
 		if int(math.Mod(float64(k), float64(2))) == 0 {
 			labels["period"] = "seven"
@@ -485,11 +499,16 @@ func generateTestFaultInjectors(count int) ([]*spec.FaultInjector, error) {
 		if int(math.Mod(float64(k), float64(3))) == 0 {
 			labels["group"] = "actinides"
 		}
+		if int(math.Mod(float64(k), float64(2))) == 0 {
+			namespace = "test-namespace-one"
+		} else {
+			namespace = "test-namespace-two"
+		}
 		specType := types[int(math.Mod(float64(k), float64(len(types))))]
 		tests = append(tests, &spec.FaultInjector{
 			ObjectMeta: v1.ObjectMeta{
 				Name:      names[k],
-				Namespace: v1.NamespaceDefault,
+				Namespace: namespace,
 				Labels:    labels,
 			},
 			Spec: spec.FaultInjectorSpec{
@@ -506,6 +525,13 @@ func prepareResourceHandlerTest() (*FaultInjectorController, *fcache.FakeControl
 	c := &FaultInjectorController{
 		kclient: clientset,
 	}
+
+	clientset.Core().Namespaces().Create(&v1.Namespace{
+		ObjectMeta: v1.ObjectMeta{Name: "test-namespace-one"},
+	})
+	clientset.Core().Namespaces().Create(&v1.Namespace{
+		ObjectMeta: v1.ObjectMeta{Name: "test-namespace-two"},
+	})
 
 	resourceHandlers := &cache.ResourceEventHandlerFuncs{
 		AddFunc:    c.handleAddFaultInjector,
@@ -531,7 +557,7 @@ func checkResourceEqual(deployment *extensionsobj.Deployment, resource *spec.Fau
 	var expected extensionsobj.Deployment
 	expected = *deployment
 	err := updateDownstreamObject(&expected, resource)
-	return (err == nil && reflect.DeepEqual(&expected, deployment))
+	return (err == nil && reflect.DeepEqual(&expected, deployment) && resource.ObjectMeta.Namespace == deployment.ObjectMeta.Namespace)
 }
 
 func validateSingleResourcePresent(t *testing.T, deploymentList []*extensionsobj.Deployment, resource *spec.FaultInjector) {

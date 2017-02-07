@@ -189,7 +189,7 @@ func (c *FaultInjectorController) prepareInitialStore() error {
 	listOptions := api.ListOptions{
 		LabelSelector: selector,
 	}
-	deployments, err := c.kclient.Extensions().Deployments(v1.NamespaceDefault).List(listOptions)
+	deployments, err := c.kclient.Extensions().Deployments(v1.NamespaceAll).List(listOptions)
 	if err != nil {
 		return err
 	}
@@ -204,7 +204,7 @@ func (c *FaultInjectorController) prepareInitialStore() error {
 		resource := &spec.FaultInjector{
 			ObjectMeta: v1.ObjectMeta{
 				Name:      name[1],
-				Namespace: v1.NamespaceDefault,
+				Namespace: deployments.Items[i].ObjectMeta.Namespace,
 				Labels:    resourceLabels,
 			},
 			Spec: spec.FaultInjectorSpec{
@@ -258,7 +258,7 @@ func (c *FaultInjectorController) addFaultInjector(newObj *spec.FaultInjector) e
 		if err != nil {
 			return err
 		}
-		downstreamObj, err = c.kclient.Extensions().Deployments(api.NamespaceDefault).Create(downstreamObj)
+		downstreamObj, err = c.kclient.Extensions().Deployments(downstreamObj.ObjectMeta.Namespace).Create(downstreamObj)
 		if err != nil {
 			return err
 		}
@@ -267,7 +267,7 @@ func (c *FaultInjectorController) addFaultInjector(newObj *spec.FaultInjector) e
 		if err != nil {
 			return err
 		}
-		downstreamObj, err = c.kclient.Extensions().Deployments(api.NamespaceDefault).Update(downstreamObj)
+		downstreamObj, err = c.kclient.Extensions().Deployments(downstreamObj.ObjectMeta.Namespace).Update(downstreamObj)
 		if err != nil {
 			return err
 		}
@@ -279,14 +279,14 @@ func (c *FaultInjectorController) addFaultInjector(newObj *spec.FaultInjector) e
 func (c *FaultInjectorController) deleteFaultInjector(obj *spec.FaultInjector) error {
 	downstreamObj := c.getDownstreamState(obj)
 	if downstreamObj != nil {
-		err := c.kclient.Extensions().Deployments(api.NamespaceDefault).Delete(downstreamObj.ObjectMeta.Name, &api.DeleteOptions{})
+		err := c.kclient.Extensions().Deployments(downstreamObj.ObjectMeta.Namespace).Delete(downstreamObj.ObjectMeta.Name, &api.DeleteOptions{})
 		return err
 	}
 	return nil
 }
 
 func (c *FaultInjectorController) getDownstreamState(obj *spec.FaultInjector) *extensionsobj.Deployment {
-	deployment, err := c.kclient.Extensions().Deployments(v1.NamespaceDefault).Get(formatDownstreamName(obj))
+	deployment, err := c.kclient.Extensions().Deployments(obj.ObjectMeta.Namespace).Get(formatDownstreamName(obj))
 	if err != nil {
 		return nil
 	}
