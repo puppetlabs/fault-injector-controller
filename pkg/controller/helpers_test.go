@@ -118,7 +118,7 @@ func TestGenerateDownstreamObject(t *testing.T) {
 			expectedObj = &extensionsobj.Deployment{
 				ObjectMeta: v1.ObjectMeta{
 					Name:      formatDownstreamName(test),
-					Namespace: v1.NamespaceDefault,
+					Namespace: test.ObjectMeta.Namespace,
 					Labels:    map[string]string{"generatedBy": "FaultInjector"},
 				},
 				Spec: extensionsobj.DeploymentSpec{
@@ -277,7 +277,7 @@ func getGenerateDownstreamObjectTests() map[string]*spec.FaultInjector {
 	tests["PodKiller-NilLabels"] = &spec.FaultInjector{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      "lithium",
-			Namespace: v1.NamespaceDefault,
+			Namespace: "test-namespace-one",
 		},
 		Spec: spec.FaultInjectorSpec{
 			Type: "PodKiller",
@@ -286,7 +286,7 @@ func getGenerateDownstreamObjectTests() map[string]*spec.FaultInjector {
 	tests["NetworkLatency-EmptyLabels"] = &spec.FaultInjector{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      "sodium",
-			Namespace: v1.NamespaceDefault,
+			Namespace: "test-namespace-two",
 			Labels:    make(map[string]string),
 		},
 		Spec: spec.FaultInjectorSpec{
@@ -296,7 +296,7 @@ func getGenerateDownstreamObjectTests() map[string]*spec.FaultInjector {
 	tests["PodKiller-OneLabel"] = &spec.FaultInjector{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      "potassium",
-			Namespace: v1.NamespaceDefault,
+			Namespace: "test-namespace-one",
 			Labels: map[string]string{
 				"period": "four",
 			},
@@ -308,7 +308,7 @@ func getGenerateDownstreamObjectTests() map[string]*spec.FaultInjector {
 	tests["PodKiller-MultipleLabels"] = &spec.FaultInjector{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      "rubidium",
-			Namespace: v1.NamespaceDefault,
+			Namespace: "test-namespace-two",
 			Labels: map[string]string{
 				"group":  "alkali",
 				"period": "four",
