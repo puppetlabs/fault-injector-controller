@@ -128,6 +128,23 @@ func TestGenerateDownstreamObject(t *testing.T) {
 						},
 						Spec: v1.PodSpec{
 							Containers: containers,
+							Volumes: []v1.Volume{
+								v1.Volume{
+									Name: "podinfo",
+									VolumeSource: v1.VolumeSource{
+										DownwardAPI: &v1.DownwardAPIVolumeSource{
+											Items: []v1.DownwardAPIVolumeFile{
+												v1.DownwardAPIVolumeFile{
+													Path: "namespace",
+													FieldRef: &v1.ObjectFieldSelector{
+														FieldPath: "metadata.namespace",
+													},
+												},
+											},
+										},
+									},
+								},
+							},
 						},
 					},
 				},
@@ -203,7 +220,18 @@ func getGenerateDownstreamContainersTests() map[string]resourceContainerMap {
 			},
 		},
 		Containers: []v1.Container{
-			{Name: "fault-injector-podkiller", Image: fmt.Sprintf("%v/fault-injector-podkiller:%v", imagePrefix, version.Version)},
+			v1.Container{
+				Name:  "fault-injector-podkiller",
+				Image: fmt.Sprintf("%v/fault-injector-podkiller:%v", imagePrefix, version.Version),
+				Args:  []string{"-namespace-file", "/etc/namespace"},
+				VolumeMounts: []v1.VolumeMount{
+					v1.VolumeMount{
+						Name:      "podinfo",
+						MountPath: "/etc",
+						ReadOnly:  false,
+					},
+				},
+			},
 		},
 		ErrorValue: nil,
 	}
